@@ -9,6 +9,7 @@ package main
 
 import (
 	"path/filepath"
+	"archive/zip"
 	"strings"
 	"io"
 	"os"
@@ -16,16 +17,20 @@ import (
 	"fmt"
 )
 
-var backupDst string
-var backupSrc string
-var backupName string
-var backupZip bool
+type backupInfo struct {
+	dst string
+	src string
+	name string
+	zip bool
+}
+
+var data backupInfo
 
 // Called by filepath.Walk() whenever it comes accross a file, 
 // determine its new path at the destination and copy over it over
 func handle(path string, f os.FileInfo, err error) error {
-	var dst = strings.Replace(path, backupSrc, "", -1)
-	dst = filepath.Join(backupDst, dst)
+	var dst = strings.Replace(path, data.src, "", -1)
+	dst = filepath.Join(data.dst, dst)
 	
 	fmt.Printf("Copying: %s -> %s\n", path, dst)
 	err = copyFile(path, dst)
@@ -36,6 +41,73 @@ func handle(path string, f os.FileInfo, err error) error {
 	}
 	
 	return nil
+}
+
+
+
+// Src: https://gist.github.com/svett/424e6784facc0ba907ae
+func zipfolder (src, dst string) error {
+	zipfile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer zipfile.Close()
+
+	archive := zip.NewWriter(zipfile)
+	defer archive.Close()
+
+	var base string // RENAME TO ROOT
+	sfi, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if sfi.IsDir() { // !REMOVE? CHECK FOR DIR EARLIER?
+		base = filepath.Base(src)
+	}
+
+	// SEPERATE INTO callback function and zip function (zipFile) just like we did before
+	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
+		if err != nil { // !!REMOVE? UNESSARY
+			return err
+		}
+		
+		// Create zip header of file for archive
+		header, err := zip.FileInfoHeader(f)
+		if err != nil {
+			return err
+		}
+
+		if base != "" { // REMOVE? Look at top messag
+			header.Name = filepath.Join(base, strings.TrimPrefix(path, src))
+		}
+
+		fmt.Printf("Zipping: %s -> %s\n", path, header.Name)
+		
+		if f.IsDir() {
+			header.Name += "/" // CHANGE THIS TO BE OPERATING SYSTEM INDEPENDANT 
+		} else {
+			header.Method = zip.Deflate
+		}
+
+		writer, err := archive.CreateHeader(header)
+		if err != nil {
+			return err
+		}
+
+		if f.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}			
+		defer file.Close()
+		_, err = io.Copy(writer, file)
+		return err
+	})
+
+	return err
 }
 
 // First check the source file is non regular (directory, symlink etc)
@@ -107,34 +179,38 @@ func copyFileContents(src, dst string) (err error) {
 
 func init() {
 	// Setup arguments/flags
-	flag.StringVar(&backupSrc, "source", "", "Path to backup")
-	flag.StringVar(&backupSrc, "s", "",  "(shorthand) Path to backup")
-	flag.StringVar(&backupDst, "destination", "", "Path to save backup to")
-	flag.StringVar(&backupDst, "d", "", "(shorthand) Path to save backup to")
-	flag.StringVar(&backupName, "name", "", "(optional) Name of folder to save backup to ")
-	flag.StringVar(&backupName, "n", "", "(optional) (shorthand) Name of folder to save backup to")
-	flag.BoolVar(&backupZip, "zip", false, "(optional) Compress backup")
-	flag.BoolVar(&backupZip, "z", false, "(optional) (shorthand) Compress backup")
+	flag.StringVar(&data.src, "source", "", "Path to backup")
+	flag.StringVar(&data.src, "s", "",  "(shorthand) Path to backup")
+	flag.StringVar(&data.dst, "destination", "", "Path to save backup to")
+	flag.StringVar(&data.dst, "d", "", "(shorthand) Path to save backup to")
+	flag.StringVar(&data.name, "name", "", "(optional) Name of folder to save backup to ")
+	flag.StringVar(&data.name, "n", "", "(optional) (shorthand) Name of folder to save backup to")
+	flag.BoolVar(&data.zip, "zip", false, "(optional) Compress the backup")
+	flag.BoolVar(&data.zip, "z", false, "(optional) (shorthand) Compress the backup")
 }
 
 func main() {
 	flag.Parse()
 
 	// Check arguments are set
-	if backupSrc == "" || backupDst == "" {
+	if data.src == "" || data.dst == "" {
 		fmt.Fprint(os.Stderr, "Please specify a source and a destination path for the backup\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	if backupName != "" {
-		backupDst = filepath.Join(backupDst, backupName)
-		if err := os.MkdirAll(backupDst, os.ModePerm); err != nil {
-			fmt.Fprint(os.Stderr, "Could not create folder %s", backupName)
+	if data.name != "" {
+		data.dst = filepath.Join(data.dst, data.name)
+		if err := os.MkdirAll(data.dst, os.ModePerm); err != nil {
+			fmt.Fprint(os.Stderr, "Could not create folder %s", data.name)
 			os.Exit(1)
 		}
 	}
-	
-	err := filepath.Walk(backupSrc, handle)
-	fmt.Printf("filepath.Walk() return %v\n", err)
+
+	err := zipfolder(data.src, data.dst)
+	//err := filepath.Walk(data.src, handle)
+	if err != nil {
+		fmt.Fprint(os.Stderr, "Oh no! gobackitup returned an error: %v\n", err)
+		os.Exit(3)
+	}
 }
