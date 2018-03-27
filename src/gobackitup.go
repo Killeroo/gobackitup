@@ -1,15 +1,12 @@
-// Todo: Use goroutines for copy contents of files 
-// Todo: Move backup details to a struct?
-// Zipping:
-// http://blog.ralch.com/tutorial/golang-working-with-zip/
-// https://gist.github.com/svett/424e6784facc0ba907ae
-// https://golang.org/src/archive/zip/example_test.go
+// TODO: Use goroutines for copy contents of files (No point limited by usb read write anyway)
+// TODO: change to capitals first (https://talks.golang.org/2014/names.slide#8) 
 
 package main
 
 import (
 	"path/filepath"
 	"archive/zip"
+	"path"
 	"strings"
 	"io"
 	"os"
@@ -28,7 +25,7 @@ var data backupInfo
 
 // Called by filepath.Walk() whenever it comes accross a file, 
 // determine its new path at the destination and copy over it over
-func handle(path string, f os.FileInfo, err error) error {
+func handle(path string, f os.FileInfo, err error) error { // TODO: Move to CopyFolder, inline function
 	var dst = strings.Replace(path, data.src, "", -1)
 	dst = filepath.Join(data.dst, dst)
 	
@@ -43,48 +40,41 @@ func handle(path string, f os.FileInfo, err error) error {
 	return nil
 }
 
+//func CopyFolder(src, dst string) (error err) {
+	
+//}
 
-
-// Src: https://gist.github.com/svett/424e6784facc0ba907ae
-func zipfolder (src, dst string) error {
-	zipfile, err := os.Create(dst)
+// Zips up folder to destination path, new zip file is names after
+// base file of the source directory.
+// First we create a zip folder at the destination path named after
+// the base directory of the source. Then we create an archive object
+// for our new zip file.
+// Next walk through the src directory and for each file we create a
+// zip info header. If its a directory add a path seperator, otherwise
+// if its a file add a deflate method then create the header in the archive.
+// Lastly if its a file we copy over the file to the archive using an
+// writer from the archive.
+func ZipFolder(src, dst string) (err error) {
+	filename := filepath.Join(data.dst, path.Base(data.src) + ".zip")
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
-	defer zipfile.Close()
+	defer file.Close()
 
-	archive := zip.NewWriter(zipfile)
+	archive := zip.NewWriter(file)
 	defer archive.Close()
 
-	var base string // RENAME TO ROOT
-	sfi, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-	if sfi.IsDir() { // !REMOVE? CHECK FOR DIR EARLIER?
-		base = filepath.Base(src)
-	}
-
-	// SEPERATE INTO callback function and zip function (zipFile) just like we did before
 	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
-		if err != nil { // !!REMOVE? UNESSARY
-			return err
-		}
-		
-		// Create zip header of file for archive
 		header, err := zip.FileInfoHeader(f)
 		if err != nil {
 			return err
 		}
-
-		if base != "" { // REMOVE? Look at top messag
-			header.Name = filepath.Join(base, strings.TrimPrefix(path, src))
-		}
-
+		header.Name = filepath.Join(base, strings.TrimPrefix(path, src))
 		fmt.Printf("Zipping: %s -> %s\n", path, header.Name)
-		
+
 		if f.IsDir() {
-			header.Name += "/" // CHANGE THIS TO BE OPERATING SYSTEM INDEPENDANT 
+			header.Name += os.PathSeparator // TODO: Bug here
 		} else {
 			header.Method = zip.Deflate
 		}
@@ -94,16 +84,16 @@ func zipfolder (src, dst string) error {
 			return err
 		}
 
-		if f.IsDir() {
+		f.IsDir() // TODO: add brackets
 			return nil
-		}
+		
 
-		file, err := os.Open(path)
+		srcFile, err := os.Open(path)
 		if err != nil {
 			return err
-		}			
-		defer file.Close()
-		_, err = io.Copy(writer, file)
+		} 
+		defer srcFile.Close()
+		_, err = io.Copy(writer, srcFile)
 		return err
 	})
 
@@ -207,10 +197,12 @@ func main() {
 		}
 	}
 
-	err := zipfolder(data.src, data.dst)
+	err := ZipFolder(data.src, data.dst)
+	
+	//err := zipfolder(data.src, data.dst)
 	//err := filepath.Walk(data.src, handle)
 	if err != nil {
-		fmt.Fprint(os.Stderr, "Oh no! gobackitup returned an error: %v\n", err)
+		fmt.Fprint(os.Stderr, "Oh no! gobackitup encountered an error: %v\n", err)
 		os.Exit(3)
 	}
 }
