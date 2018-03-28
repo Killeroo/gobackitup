@@ -65,6 +65,8 @@ func ZipFolder(src, dst string) (err error) {
 	archive := zip.NewWriter(file)
 	defer archive.Close()
 
+	base := filepath.Base(src)
+
 	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
 		header, err := zip.FileInfoHeader(f)
 		if err != nil {
@@ -74,7 +76,7 @@ func ZipFolder(src, dst string) (err error) {
 		fmt.Printf("Zipping: %s -> %s\n", path, header.Name)
 
 		if f.IsDir() {
-			header.Name += os.PathSeparator // TODO: Bug here
+			header.Name += "/" //os.PathSeparator // TODO: Bug here
 		} else {
 			header.Method = zip.Deflate
 		}
@@ -84,8 +86,9 @@ func ZipFolder(src, dst string) (err error) {
 			return err
 		}
 
-		f.IsDir() // TODO: add brackets
+		if f.IsDir() {
 			return nil
+		} 
 		
 
 		srcFile, err := os.Open(path)
@@ -176,7 +179,7 @@ func init() {
 	flag.StringVar(&data.name, "name", "", "(optional) Name of folder to save backup to ")
 	flag.StringVar(&data.name, "n", "", "(optional) (shorthand) Name of folder to save backup to")
 	flag.BoolVar(&data.zip, "zip", false, "(optional) Compress the backup")
-	flag.BoolVar(&data.zip, "z", false, "(optional) (shorthand) Compress the backup")
+	flag.BoolVar(&data.zip, "z", false, "\n(optional) (shorthand) Compress the backup")
 }
 
 func main() {
@@ -197,10 +200,14 @@ func main() {
 		}
 	}
 
-	err := ZipFolder(data.src, data.dst)
+	var err error
+
+	if data.zip {
+		err = ZipFolder(data.src, data.dst)	
+	} else {
+		err = filepath.Walk(data.src, handle)
+	}
 	
-	//err := zipfolder(data.src, data.dst)
-	//err := filepath.Walk(data.src, handle)
 	if err != nil {
 		fmt.Fprint(os.Stderr, "Oh no! gobackitup encountered an error: %v\n", err)
 		os.Exit(3)
