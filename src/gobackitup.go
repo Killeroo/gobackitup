@@ -23,37 +23,30 @@ type backupInfo struct {
 
 var data backupInfo
 
-// Called by filepath.Walk() whenever it comes accross a file, 
-// determine its new path at the destination and copy over it over
-func handle(path string, f os.FileInfo, err error) error { // TODO: Move to CopyFolder, inline function
-	var dst = strings.Replace(path, data.src, "", -1)
-	dst = filepath.Join(data.dst, dst)
-	
-	fmt.Printf("Copying: %s -> %s\n", path, dst)
-	err = copyFile(path, dst)
-	if err != nil {
-		fmt.Printf("CopyFile failed %q\n", err)
-	} else {
-		fmt.Printf("CopyFile succeeded\n")
-	}
-	
-	return nil
+func FileSize(size float64) (result string) {
+	// TODO: return kb mb or gb as string using 
 }
+
 // TODO: Add a description
 func CopyFolder(src, dst string) (err error) {
 
 	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
 		var dst = strings.Replace(path, data.src, "", -1)
 		dst = filepath.Join(data.dst, dst)
+
+		// TODO: dont print when its agolder
 		
-		fmt.Printf("Copying: %s -> %s\n", path, dst)
+		fmt.Printf("Copying: %s [%dMB] -> ", path, (f.Size()/1024))
+		
 		err = copyFile(path, dst)
 		if err != nil {
 			fmt.Printf("CopyFile failed %q\n", err)
 		} else {
 			fmt.Printf("CopyFile succeeded\n")
-		}		return nil // TODO: really?
-	})	return err
+		}		
+		return nil // TODO: really?
+	})	
+	return err
 }
 
 // Zips up folder to destination path, new zip file is names after
