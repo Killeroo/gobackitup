@@ -26,6 +26,10 @@ type backupInfo struct {
 
 var data backupInfo
 
+// Results
+var errors int
+var bytesCopied uint64
+
 // Coverts bytes to string of appropriate size and denomination (rounds up) 
 // Eg 1500 bytes -> "1KB", 
 func FileSize(size int64) (result string) {
@@ -40,6 +44,40 @@ func FileSize(size int64) (result string) {
 	} 
 }
 
+// Displays and counts error messages
+func ErrorMsg(err error) {
+	ct.Foreground(ct.Red, false)
+	fmt.Printf("Error: %q\n", err)
+	ct.ResetColor()
+
+	errors++
+}
+
+// Writes some output to console about a given file when copying or zipping
+func DeclareFile(f os.FileInfo, path string) {
+	if data.zip {
+		fmt.Printf("Zipping:")
+	} else {
+		fmt.Printf("Copying:")
+	}
+	fmt.Printf(" %s ", path)
+
+	size := FileSize(f.Size())
+	if strings.ContainsAny(size, "G") {
+		ct.Foreground(ct.Magenta, false)
+	} else if strings.ContainsAny(size, "M") {
+		ct.Foreground(ct.Blue, false)
+	} else if strings.ContainsAny(size, "K") {
+		ct.Foreground(ct.Cyan, false)
+	} else if strings.ContainsAny(size, "B") {
+		ct.Foreground(ct.Green, false)
+	}
+			
+	fmt.Printf("[%s]", size)
+	ct.ResetColor()
+	fmt.Printf(" -> ")
+}
+
 // Zips up folder to destination path, new zip file is names after
 // base file of the source directory.
 // First we create a zip folder at the destination path named after
@@ -51,11 +89,19 @@ func FileSize(size int64) (result string) {
 // Lastly if its a file we copy over the file to the archive using an
 // writer from the archive.
 func ZipFolder(src, dst string) (err error) {
-	zipname := path.Base(data.src)
-	if strings.ContainsAny(zipname, ":") {
-		fmt.Printf("here")
+	// Work out filename
+	var zipname = ""
+	if data.name != "" {
+		zipname = data.name	
+	} else {
+		zipname = path.Base(data.src)
+		if strings.ContainsAny(zipname, ":") {
+			strings.Replace(zipname, ":\\", "", -1)
+			fmt.Printf(zipname)
+		}
 	}
-	filename := filepath.Join(data.dst, path.Base(data.src) + ".zip") // Windows bug here
+	
+	filename := filepath.Join(data.dst, zipname + ".zip") // Windows bug here
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -70,30 +116,14 @@ func ZipFolder(src, dst string) (err error) {
 	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
 		header, err := zip.FileInfoHeader(f)
 		if err != nil {
+			ErrorMsg(err)
 			return err
 		}
 		header.Name = filepath.Join(base, strings.TrimPrefix(path, src))
-		//fmt.Printf("Zipping: %s -> %s\n", path, header.Name)
 		
 		// Only print out info on files
 		if (!f.Mode().IsDir()) { 
-			fmt.Printf("Zipping: %s ", path)
-
-			size := FileSize(f.Size())
-			if strings.ContainsAny(size, "G") {
-				ct.Foreground(ct.Magenta, false)
-			} else if strings.ContainsAny(size, "M") {
-				ct.Foreground(ct.Blue, false)
-			} else if strings.ContainsAny(size, "K") {
-				ct.Foreground(ct.Cyan, false)
-			} else if strings.ContainsAny(size, "B") {
-				ct.Foreground(ct.Green, false)
-			}
-			
-			fmt.Printf("[%s]", size)
-;
-			ct.ResetColor()
-			fmt.Printf(" -> ")
+			DeclareFile(f, path)
 		}
 		
 		if f.IsDir() {
@@ -104,6 +134,7 @@ func ZipFolder(src, dst string) (err error) {
 
 		writer, err := archive.CreateHeader(header)
 		if err != nil {
+			ErrorMsg(err)
 			return err
 		}
 
@@ -111,13 +142,23 @@ func ZipFolder(src, dst string) (err error) {
 			return nil
 		} 
 		
-
 		srcFile, err := os.Open(path)
 		if err != nil {
+			ErrorMsg(err)
 			return err
 		} 
 		defer srcFile.Close()
+		
 		_, err = io.Copy(writer, srcFile)
+		if err != nil {
+			ErrorMsg(err)
+		} else {
+			if !f.Mode().IsDir() {
+				ct.Foreground(ct.Green, false)
+				fmt.Printf("ZipFile succeeded\n")
+				ct.ResetColor()
+			}
+		}
 		return err
 	})
 
@@ -131,30 +172,12 @@ func CopyFolder(src, dst string) (err error) {
 		var dst = strings.Replace(path, data.src, "", -1)
 		dst = filepath.Join(data.dst, dst)
 
-		// Only print out info on files
 		if (!f.Mode().IsDir()) { 
-			fmt.Printf("Copying: %s ", path)
-
-			size := FileSize(f.Size())
-			if strings.ContainsAny(size, "G") {
-				ct.Foreground(ct.Magenta, false)
-			} else if strings.ContainsAny(size, "M") {
-				ct.Foreground(ct.Blue, false)
-			} else if strings.ContainsAny(size, "K") {
-				ct.Foreground(ct.Cyan, false)
-			} else if strings.ContainsAny(size, "B") {
-				ct.Foreground(ct.Green, false)
-			}
-			
-			fmt.Printf("[%s]", size);
-			ct.ResetColor()
-			fmt.Printf(" -> ")
+			DeclareFile(f, path)
 		}
 		err = copyFile(path, dst)
 		if err != nil {
-			ct.Foreground(ct.Red, false)
-			fmt.Printf("Error: %q\n", err)
-			ct.ResetColor()
+			ErrorMsg(err)
 		} else {
 			if (!f.Mode().IsDir()) {
 				ct.Foreground(ct.Green, false)
@@ -256,7 +279,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if data.name != "" {
+	if data.name != "" && !data.zip {
 		data.dst = filepath.Join(data.dst, data.name)
 		if err := os.MkdirAll(data.dst, os.ModePerm); err != nil {
 			fmt.Fprint(os.Stderr, "Could not create folder %s", data.name)
@@ -275,5 +298,7 @@ func main() {
 	if err != nil {
 		fmt.Fprint(os.Stderr, "Oh no! gobackitup encountered an error: %v\n", err)
 		os.Exit(3)
+	} else {
+		
 	}
 }
