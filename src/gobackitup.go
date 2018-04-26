@@ -7,7 +7,8 @@ package main
 import (
 	"path/filepath"
 	"archive/zip"
-	"path"
+	"time"
+	//"path"
 	"strings"
 	"io"
 	"os"
@@ -27,12 +28,12 @@ type backupInfo struct {
 var data backupInfo
 
 // Results
-var errors int
+var errors, files int
 var bytesCopied uint64
 
 // Coverts bytes to string of appropriate size and denomination (rounds up) 
-// Eg 1500 bytes -> "1KB", 
-func FileSize(size int64) (result string) {
+// Eg '1500' bytes -> '1KB'
+func FileSize(size uint64) (result string) {
 	if size < 1024 {
 		return strconv.Itoa(int(size)) + "B"
 	} else if conv := (size / 1024); conv < 1024 {
@@ -62,7 +63,7 @@ func DeclareFile(f os.FileInfo, path string) {
 	}
 	fmt.Printf(" %s ", path)
 
-	size := FileSize(f.Size())
+	size := FileSize(uint64(f.Size()))
 	if strings.ContainsAny(size, "G") {
 		ct.Foreground(ct.Magenta, false)
 	} else if strings.ContainsAny(size, "M") {
@@ -76,6 +77,9 @@ func DeclareFile(f os.FileInfo, path string) {
 	fmt.Printf("[%s]", size)
 	ct.ResetColor()
 	fmt.Printf(" -> ")
+
+	bytesCopied += uint64(f.Size())
+	files++
 }
 
 // Zips up folder to destination path, new zip file is names after
@@ -94,11 +98,14 @@ func ZipFolder(src, dst string) (err error) {
 	if data.name != "" {
 		zipname = data.name	
 	} else {
-		zipname = path.Base(data.src)
-		if strings.ContainsAny(zipname, ":") {
-			strings.Replace(zipname, ":\\", "", -1)
-			fmt.Printf(zipname)
+		zipname = filepath.Base(data.src)
+		if zipname == "\\" {
+			t := time.Now()
+			zipname = strings.Trim(filepath.VolumeName(data.src), ":") + "_backup_" + string(t.Day()) + "-" + string(t.Month()) + "-" + string(t.Year()) 
 		}
+		t := time.Now()
+		fmt.Printf(string(t.Day()))
+		os.Exit(1)//filepath.VolumeName(zipname))
 	}
 	
 	filename := filepath.Join(data.dst, zipname + ".zip") // Windows bug here
@@ -155,7 +162,7 @@ func ZipFolder(src, dst string) (err error) {
 		} else {
 			if !f.Mode().IsDir() {
 				ct.Foreground(ct.Green, false)
-				fmt.Printf("ZipFile succeeded\n")
+				fmt.Printf("File archieved\n")
 				ct.ResetColor()
 			}
 		}
@@ -165,9 +172,9 @@ func ZipFolder(src, dst string) (err error) {
 	return err
 }
 
-// TODO: Add a description
+// Copies a folder to a new location
 func CopyFolder(src, dst string) (err error) {
-
+	
 	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
 		var dst = strings.Replace(path, data.src, "", -1)
 		dst = filepath.Join(data.dst, dst)
@@ -181,7 +188,7 @@ func CopyFolder(src, dst string) (err error) {
 		} else {
 			if (!f.Mode().IsDir()) {
 				ct.Foreground(ct.Green, false)
-				fmt.Printf("CopyFile succeeded\n")
+				fmt.Printf("File copied\n")
 				ct.ResetColor()
 			}
 		}
@@ -299,6 +306,9 @@ func main() {
 		fmt.Fprint(os.Stderr, "Oh no! gobackitup encountered an error: %v\n", err)
 		os.Exit(3)
 	} else {
-		
+		fmt.Printf("Backup complete.\n")
+		fmt.Printf("Saved to ")
+		fmt.Printf("Processed %d files (%s total)\n", files, FileSize(bytesCopied))
+		fmt.Printf("Encountered %d errors\n", errors)
 	}
 }
