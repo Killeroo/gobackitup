@@ -1,14 +1,13 @@
 // TODO: Use goroutines for copy contents of files (No point limited by usb read write anyway)
 // TODO: change to capitals first (https://talks.golang.org/2014/names.slide#8) 
-// TODO: Add some colours and maybe file sizes
 // TODO: Autocreate backup director
+// TODO: Use of pass data object instead of seperate src, dst variables
+
 package main
 
 import (
 	"path/filepath"
 	"archive/zip"
-	"time"
-	//"path"
 	"strings"
 	"io"
 	"os"
@@ -84,28 +83,24 @@ func DeclareFile(f os.FileInfo, path string) {
 
 // Zips up folder to destination path, new zip file is names after
 // base file of the source directory.
-// First we create a zip folder at the destination path named after
-// the base directory of the source. Then we create an archive object
-// for our new zip file.
+// First we determine the name of the zip file, we account for a few 
+// edge cases here (mainly on windows). Then we create a zip file 
+// at the destination path named after the base directory of the source.
+// Then we create an archive object for our new zip file.
 // Next walk through the src directory and for each file we create a
 // zip info header. If its a directory add a path seperator, otherwise
 // if its a file add a deflate method then create the header in the archive.
 // Lastly if its a file we copy over the file to the archive using an
 // writer from the archive.
 func ZipFolder(src, dst string) (err error) {
-	// Work out filename
 	var zipname = ""
 	if data.name != "" {
 		zipname = data.name	
 	} else {
 		zipname = filepath.Base(data.src)
-		if zipname == "\\" {
-			t := time.Now()
-			zipname = strings.Trim(filepath.VolumeName(data.src), ":") + "_backup_" + string(t.Day()) + "-" + string(t.Month()) + "-" + string(t.Year()) 
+		if zipname == "\\" {
+			zipname = strings.Trim(filepath.VolumeName(data.src), ":") + "_backup" 
 		}
-		t := time.Now()
-		fmt.Printf(string(t.Day()))
-		os.Exit(1)//filepath.VolumeName(zipname))
 	}
 	
 	filename := filepath.Join(data.dst, zipname + ".zip") // Windows bug here
@@ -134,7 +129,7 @@ func ZipFolder(src, dst string) (err error) {
 		}
 		
 		if f.IsDir() {
-			header.Name += "/" //os.PathSeparator // TODO: Bug here
+			header.Name += "/"
 		} else {
 			header.Method = zip.Deflate
 		}
@@ -172,8 +167,10 @@ func ZipFolder(src, dst string) (err error) {
 	return err
 }
 
-// Copies a folder to a new location
+// Copies a folder to a new location, base folder of the
+// source is used at the destination path
 func CopyFolder(src, dst string) (err error) {
+	data.dst = filepath.Join(dst, filepath.Base(src))
 	
 	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
 		var dst = strings.Replace(path, data.src, "", -1)
@@ -280,12 +277,14 @@ func main() {
 	flag.Parse()
 
 	// Check arguments are set
+	// TODO: Check if src and dst exist
 	if data.src == "" || data.dst == "" {
 		fmt.Fprint(os.Stderr, "Please specify a source and a destination path for the backup\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
+	// TODO: drive folder and backup folder creation here
 	if data.name != "" && !data.zip {
 		data.dst = filepath.Join(data.dst, data.name)
 		if err := os.MkdirAll(data.dst, os.ModePerm); err != nil {
@@ -307,7 +306,7 @@ func main() {
 		os.Exit(3)
 	} else {
 		fmt.Printf("Backup complete.\n")
-		fmt.Printf("Saved to ")
+		fmt.Printf("Saved to %s", data.dst)
 		fmt.Printf("Processed %d files (%s total)\n", files, FileSize(bytesCopied))
 		fmt.Printf("Encountered %d errors\n", errors)
 	}
