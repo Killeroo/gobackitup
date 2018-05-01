@@ -2,7 +2,9 @@
 
 [![](https://img.shields.io/badge/version-1.0-brightgreen.svg)]()
 
-Small and simple cross platform backup program
+Small and simple cross platform backup program. Download it [here.](https://github.com/Killeroo/gobackitup/releases)
+
+![](https://user-images.githubusercontent.com/9999745/39470871-012e505c-4d38-11e8-9b97-02556598a7ed.png)
 
 # Usage
 
