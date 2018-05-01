@@ -1,6 +1,6 @@
 # gobackitup
 
-[![](https://img.shields.io/badge/version-1.0-brightgreen.svg)]()
+[![](https://img.shields.io/badge/version-1.0-brightgreen.svg)]() [![Go Report Card](https://goreportcard.com/badge/github.com/Killeroo/gobackitup)](https://goreportcard.com/report/github.com/Killeroo/gobackitup)
 
 Small and simple cross platform backup program. Download it [here.](https://github.com/Killeroo/gobackitup/releases)
 
