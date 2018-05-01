@@ -1,6 +1,5 @@
-// TODO: Use goroutines for copy contents of files (No point limited by usb read write anyway)
-// TODO: change to capitals first (https://talks.golang.org/2014/names.slide#8) 
-// TODO: Autocreate backup director
+// TODO: Use goroutines for copy contents of files (No point limited by usb read write anyway) 
+// TODO: Autocreate backup directory
 // TODO: Use of pass data object instead of seperate src, dst variables
 
 package main
@@ -179,7 +178,7 @@ func CopyFolder(src, dst string) (err error) {
 		if (!f.Mode().IsDir()) { 
 			DeclareFile(f, path)
 		}
-		err = copyFile(path, dst)
+		err = CopyFile(path, dst)
 		if err != nil {
 			ErrorMsg(err)
 		} else {
@@ -202,7 +201,7 @@ func CopyFolder(src, dst string) (err error) {
 // same in as the source file
 // Else copy the contents of the source file to the new destination file
 // Source: https://stackoverflow.com/a/21067803
-func copyFile(src, dst string) (err error) {
+func CopyFile(src, dst string) (err error) {
 	sfi, err := os.Stat(src)
 	if err != nil {
 		return
@@ -230,13 +229,13 @@ func copyFile(src, dst string) (err error) {
 		}
 	}
 
-	err = copyFileContents(src, dst)
+	err = CopyFileContents(src, dst)
 	return
 }
 
 // Open up the source file and create and copy the contents over to the new
 // destination file
-func copyFileContents(src, dst string) (err error) {
+func CopyFileContents(src, dst string) (err error) {
 	in, err := os.Open(src)
 	if err != nil {
 		return
@@ -306,7 +305,7 @@ func main() {
 		os.Exit(3)
 	} else {
 		fmt.Printf("Backup complete.\n")
-		fmt.Printf("Saved to %s", data.dst)
+		fmt.Printf("Saved to %s\n", data.dst)
 		fmt.Printf("Processed %d files (%s total)\n", files, FileSize(bytesCopied))
 		fmt.Printf("Encountered %d errors\n", errors)
 	}
