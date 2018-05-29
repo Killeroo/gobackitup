@@ -1,6 +1,7 @@
 // TODO: Use goroutines for copy contents of files (No point limited by usb read write anyway) 
 // TODO: Autocreate backup directory
 // TODO: Use of pass data object instead of seperate src, dst variables
+// TODO: CamelCase for function names
 
 package main
 
@@ -65,9 +66,9 @@ func DeclareFile(f os.FileInfo, path string) {
 	if strings.ContainsAny(size, "G") {
 		ct.Foreground(ct.Magenta, false)
 	} else if strings.ContainsAny(size, "M") {
-		ct.Foreground(ct.Blue, false)
+		ct.Foreground(ct.Red, false)
 	} else if strings.ContainsAny(size, "K") {
-		ct.Foreground(ct.Cyan, false)
+		ct.Foreground(ct.Yellow, false)
 	} else if strings.ContainsAny(size, "B") {
 		ct.Foreground(ct.Green, false)
 	}
@@ -97,7 +98,8 @@ func ZipFolder(src, dst string) (err error) {
 		zipname = data.name	
 	} else {
 		zipname = filepath.Base(data.src)
-		if zipname == "\\" {
+		if zipname == "\\" {
+
 			zipname = strings.Trim(filepath.VolumeName(data.src), ":") + "_backup" 
 		}
 	}
