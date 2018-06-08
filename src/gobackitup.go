@@ -32,10 +32,10 @@ var bytesCopied uint64
 
 // Coverts bytes to string of appropriate size and denomination (rounds up) 
 // Eg '1500' bytes -> '1KB'
-func FileSize(size uint64) (result string) {
+func fileSize(size uint64) (result string) {
 	if size < 1024 {
 		return strconv.Itoa(int(size)) + "B"
-	} else if conv := (size / 1024); conv < 1024 {
+	} else if conv := size / 1024; conv < 1024 {
 		return strconv.Itoa(int(conv)) + "KB"
 	} else if  conv := (size/1024)/1024; conv < 1024 {
 		return strconv.Itoa(int(conv)) + "MB"
@@ -62,7 +62,7 @@ func DeclareFile(f os.FileInfo, path string) {
 	}
 	fmt.Printf(" %s ", path)
 
-	size := FileSize(uint64(f.Size()))
+	size := fileSize(uint64(f.Size()))
 	if strings.ContainsAny(size, "G") {
 		ct.Foreground(ct.Magenta, false)
 	} else if strings.ContainsAny(size, "M") {
@@ -88,11 +88,11 @@ func DeclareFile(f os.FileInfo, path string) {
 // at the destination path named after the base directory of the source.
 // Then we create an archive object for our new zip file.
 // Next walk through the src directory and for each file we create a
-// zip info header. If its a directory add a path seperator, otherwise
+// zip info header. If its a directory add a path separator, otherwise
 // if its a file add a deflate method then create the header in the archive.
 // Lastly if its a file we copy over the file to the archive using an
 // writer from the archive.
-func ZipFolder(src, dst string) (err error) {
+func zipFolder(src string) (err error) {
 	var zipname = ""
 	if data.name != "" {
 		zipname = data.name	
@@ -125,7 +125,7 @@ func ZipFolder(src, dst string) (err error) {
 		header.Name = filepath.Join(base, strings.TrimPrefix(path, src))
 		
 		// Only print out info on files
-		if (!f.Mode().IsDir()) { 
+		if !f.Mode().IsDir() {
 			DeclareFile(f, path)
 		}
 		
@@ -170,7 +170,7 @@ func ZipFolder(src, dst string) (err error) {
 
 // Copies a folder to a new location, base folder of the
 // source is used at the destination path
-func CopyFolder(src, dst string) (err error) {
+func copyFolder(src, dst string) (err error) {
 	data.dst = filepath.Join(dst, filepath.Base(src))
 	
 	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
@@ -180,7 +180,7 @@ func CopyFolder(src, dst string) (err error) {
 		if (!f.Mode().IsDir()) { 
 			DeclareFile(f, path)
 		}
-		err = CopyFile(path, dst)
+		err = copyFile(path, dst)
 		if err != nil {
 			ErrorMsg(err)
 		} else {
@@ -203,7 +203,7 @@ func CopyFolder(src, dst string) (err error) {
 // same in as the source file
 // Else copy the contents of the source file to the new destination file
 // Source: https://stackoverflow.com/a/21067803
-func CopyFile(src, dst string) (err error) {
+func copyFile(src, dst string) (err error) {
 	sfi, err := os.Stat(src)
 	if err != nil {
 		return
@@ -231,13 +231,13 @@ func CopyFile(src, dst string) (err error) {
 		}
 	}
 
-	err = CopyFileContents(src, dst)
+	err = copyFileContents(src, dst)
 	return
 }
 
 // Open up the source file and create and copy the contents over to the new
 // destination file
-func CopyFileContents(src, dst string) (err error) {
+func copyFileContents(src, dst string) (err error) {
 	in, err := os.Open(src)
 	if err != nil {
 		return
@@ -262,6 +262,13 @@ func CopyFileContents(src, dst string) (err error) {
 	return
 }
 
+func usage() {
+	fmt.Println("gobackitup [options] --source <PATH> --destination <PATH>")
+	fmt.Println("Options:")
+	flag.PrintDefaults()
+	os.Exit(0)
+}
+
 func init() {
 	// Setup arguments/flags
 	flag.StringVar(&data.src, "source", "", "Path to backup")
@@ -275,14 +282,20 @@ func init() {
 }
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
-
+	
 	// Check arguments are set
-	// TODO: Check if src and dst exist
 	if data.src == "" || data.dst == "" {
 		fmt.Fprint(os.Stderr, "Please specify a source and a destination path for the backup\n")
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	// Check paths exist
+	if _, err := os.Stat(data.src); os.IsNotExist(err) {
+		fmt.Fprint(os.Stderr, "Source or destination path not found. Please check they exist and try again")
+		os.Exit(1)		
 	}
 
 	// TODO: drive folder and backup folder creation here
@@ -297,9 +310,9 @@ func main() {
 	var err error
 
 	if data.zip {
-		err = ZipFolder(data.src, data.dst)	
+		err = zipFolder(data.src)
 	} else {
-		err = CopyFolder(data.src, data.dst)
+		err = copyFolder(data.src, data.dst)
 	}
 	
 	if err != nil {
@@ -308,7 +321,7 @@ func main() {
 	} else {
 		fmt.Printf("Backup complete.\n")
 		fmt.Printf("Saved to %s\n", data.dst)
-		fmt.Printf("Processed %d files (%s total)\n", files, FileSize(bytesCopied))
+		fmt.Printf("Processed %d files (%s total)\n", files, fileSize(bytesCopied))
 		fmt.Printf("Encountered %d errors\n", errors)
 	}
 }
