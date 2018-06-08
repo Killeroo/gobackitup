@@ -1,7 +1,6 @@
 // TODO: Use goroutines for copy contents of files (No point limited by usb read write anyway) 
 // TODO: Autocreate backup directory
 // TODO: Use of pass data object instead of seperate src, dst variables
-// TODO: CamelCase for function names
 
 package main
 
@@ -173,24 +172,24 @@ func zipFolder(src string) (err error) {
 func copyFolder(src, dst string) (err error) {
 	data.dst = filepath.Join(dst, filepath.Base(src))
 	
-	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
+	err = filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
 		var dst = strings.Replace(path, data.src, "", -1)
 		dst = filepath.Join(data.dst, dst)
 
-		if (!f.Mode().IsDir()) { 
+		if !f.Mode().IsDir() {
 			DeclareFile(f, path)
 		}
 		err = copyFile(path, dst)
 		if err != nil {
 			ErrorMsg(err)
 		} else {
-			if (!f.Mode().IsDir()) {
+			if !f.Mode().IsDir() {
 				ct.Foreground(ct.Green, false)
 				fmt.Printf("File copied\n")
 				ct.ResetColor()
 			}
 		}
-		return nil // TODO: really?
+		return err
 	})	
 	return err
 }
@@ -288,6 +287,7 @@ func main() {
 	// Check arguments are set
 	if data.src == "" || data.dst == "" {
 		fmt.Fprint(os.Stderr, "Please specify a source and a destination path for the backup\n")
+		fmt.Fprint(os.Stderr, "Use gobackitup --help for options")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -295,6 +295,7 @@ func main() {
 	// Check paths exist
 	if _, err := os.Stat(data.src); os.IsNotExist(err) {
 		fmt.Fprint(os.Stderr, "Source or destination path not found. Please check they exist and try again")
+		fmt.Fprint(os.Stderr, "Use gobackitup --help for options")
 		os.Exit(1)		
 	}
 
