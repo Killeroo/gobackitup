@@ -16,14 +16,14 @@ import (
 	"github.com/daviddengcn/go-colortext"
 )
 
-type backupInfo struct {
+type BackupInfo struct {
 	dst string
 	src string
 	name string
 	zip bool
 }
 
-var data backupInfo
+var data BackupInfo
 
 // Results
 var errors, files int
@@ -44,7 +44,7 @@ func fileSize(size uint64) (result string) {
 }
 
 // Displays and counts error messages
-func ErrorMsg(err error) {
+func errorMsg(err error) {
 	ct.Foreground(ct.Red, false)
 	fmt.Printf("Error: %q\n", err)
 	ct.ResetColor()
@@ -53,7 +53,7 @@ func ErrorMsg(err error) {
 }
 
 // Writes some output to console about a given file when copying or zipping
-func DeclareFile(f os.FileInfo, path string) {
+func declareFile(f os.FileInfo, path string) {
 	if data.zip {
 		fmt.Printf("Zipping:")
 	} else {
@@ -91,19 +91,19 @@ func DeclareFile(f os.FileInfo, path string) {
 // if its a file add a deflate method then create the header in the archive.
 // Lastly if its a file we copy over the file to the archive using an
 // writer from the archive.
-func zipFolder(src string) (err error) {
+func zipFolder(info BackupInfo) (err error) {
 	var zipname = ""
-	if data.name != "" {
-		zipname = data.name	
+	if info.name != "" {
+		zipname = info.name
 	} else {
-		zipname = filepath.Base(data.src)
+		zipname = filepath.Base(info.src)
 		if zipname == "\\" {
 
-			zipname = strings.Trim(filepath.VolumeName(data.src), ":") + "_backup" 
+			zipname = strings.Trim(filepath.VolumeName(info.src), ":") + "_backup"
 		}
 	}
 	
-	filename := filepath.Join(data.dst, zipname + ".zip") // Windows bug here
+	filename := filepath.Join(info.dst, zipname + ".zip") // Windows bug here
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -113,19 +113,19 @@ func zipFolder(src string) (err error) {
 	archive := zip.NewWriter(file)
 	defer archive.Close()
 
-	base := filepath.Base(src)
+	base := filepath.Base(info.src)
 
-	filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
+	filepath.Walk(info.src, func(path string, f os.FileInfo, err error) error {
 		header, err := zip.FileInfoHeader(f)
 		if err != nil {
-			ErrorMsg(err)
+			errorMsg(err)
 			return err
 		}
-		header.Name = filepath.Join(base, strings.TrimPrefix(path, src))
+		header.Name = filepath.Join(base, strings.TrimPrefix(path, info.src))
 		
 		// Only print out info on files
 		if !f.Mode().IsDir() {
-			DeclareFile(f, path)
+			declareFile(f, path)
 		}
 		
 		if f.IsDir() {
@@ -136,7 +136,7 @@ func zipFolder(src string) (err error) {
 
 		writer, err := archive.CreateHeader(header)
 		if err != nil {
-			ErrorMsg(err)
+			errorMsg(err)
 			return err
 		}
 
@@ -146,14 +146,14 @@ func zipFolder(src string) (err error) {
 		
 		srcFile, err := os.Open(path)
 		if err != nil {
-			ErrorMsg(err)
+			errorMsg(err)
 			return err
 		} 
 		defer srcFile.Close()
 		
 		_, err = io.Copy(writer, srcFile)
 		if err != nil {
-			ErrorMsg(err)
+			errorMsg(err)
 		} else {
 			if !f.Mode().IsDir() {
 				ct.Foreground(ct.Green, false)
@@ -169,19 +169,19 @@ func zipFolder(src string) (err error) {
 
 // Copies a folder to a new location, base folder of the
 // source is used at the destination path
-func copyFolder(src, dst string) (err error) {
-	data.dst = filepath.Join(dst, filepath.Base(src))
+func copyFolder(info BackupInfo) (err error) {
+	info.dst = filepath.Join(info.dst, filepath.Base(info.src))
 	
-	err = filepath.Walk(src, func(path string, f os.FileInfo, err error) error {
+	err = filepath.Walk(info.src, func(path string, f os.FileInfo, err error) error {
 		var dst = strings.Replace(path, data.src, "", -1)
 		dst = filepath.Join(data.dst, dst)
 
 		if !f.Mode().IsDir() {
-			DeclareFile(f, path)
+			declareFile(f, path)
 		}
 		err = copyFile(path, dst)
 		if err != nil {
-			ErrorMsg(err)
+			errorMsg(err)
 		} else {
 			if !f.Mode().IsDir() {
 				ct.Foreground(ct.Green, false)
@@ -311,9 +311,9 @@ func main() {
 	var err error
 
 	if data.zip {
-		err = zipFolder(data.src)
+		err = zipFolder(data)
 	} else {
-		err = copyFolder(data.src, data.dst)
+		err = copyFolder(data)
 	}
 	
 	if err != nil {
