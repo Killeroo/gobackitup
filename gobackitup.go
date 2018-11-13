@@ -75,7 +75,7 @@ func declareFile(f os.FileInfo, path string) {
 
 	fmt.Printf("[%s]", size)
 	ct.ResetColor()
-	fmt.Printf(" -> ")
+	fmt.Printf("...\n")//(" -> ")
 
 	bytesCopied += uint64(f.Size())
 	files++
@@ -172,6 +172,7 @@ func zipFolder(info BackupInfo) (err error) {
 // source is used at the destination path
 func copyFolder(info BackupInfo) (err error) {
 	info.dst = filepath.Join(info.dst, filepath.Base(info.src))
+	results := make(chan bool, 4)
 
 	err = filepath.Walk(info.src, func(path string, f os.FileInfo, err error) error {
 		var dst = strings.Replace(path, data.src, "", -1)
@@ -180,16 +181,20 @@ func copyFolder(info BackupInfo) (err error) {
 		if !f.Mode().IsDir() {
 			declareFile(f, path)
 		}
-		err = copyFile(path, dst)
-		if err != nil {
-			errorMsg(err)
-		} else {
-			if !f.Mode().IsDir() {
-				ct.Foreground(ct.Green, false)
-				fmt.Printf("File copied\n")
-				ct.ResetColor()
-			}
-		}
+
+		go copyFile(path, dst, results)
+
+		//err = copyFile(path, dst)
+		//if err != nil {
+		// if <-results {
+		// 	errorMsg(err)
+		// } else {
+		// 	if !f.Mode().IsDir() {
+		// 		ct.Foreground(ct.Green, false)
+		// 		fmt.Printf("File copied\n")
+		// 		ct.ResetColor()
+		// 	}
+		// }
 		return err
 	})
 	return err
@@ -203,7 +208,7 @@ func copyFolder(info BackupInfo) (err error) {
 // same in as the source file
 // Else copy the contents of the source file to the new destination file
 // Source: https://stackoverflow.com/a/21067803
-func copyFile(src, dst string) (err error) {
+func copyFile(src, dst string, result chan<- bool) (err error) {
 	sfi, err := os.Stat(src)
 	if err != nil {
 		return
@@ -232,6 +237,11 @@ func copyFile(src, dst string) (err error) {
 	}
 
 	err = copyFileContents(src, dst)
+	if err != nil {
+		result <- false
+	} else {
+		result <- true
+	}
 	return
 }
 
