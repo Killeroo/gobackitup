@@ -75,7 +75,7 @@ func declareFile(f os.FileInfo, path string) {
 
 	fmt.Printf("[%s]", size)
 	ct.ResetColor()
-	fmt.Printf("...\n")//(" -> ")
+	fmt.Printf("...\n") //(" -> ")
 
 	bytesCopied += uint64(f.Size())
 	files++
@@ -182,6 +182,8 @@ func copyFolder(info BackupInfo) (err error) {
 			declareFile(f, path)
 		}
 
+		<-results
+		//results <- true
 		go copyFile(path, dst, results)
 
 		//err = copyFile(path, dst)
@@ -195,6 +197,9 @@ func copyFolder(info BackupInfo) (err error) {
 		// 		ct.ResetColor()
 		// 	}
 		// }
+
+		//@<-results KINDA works :/
+
 		return err
 	})
 	return err
@@ -235,7 +240,7 @@ func copyFile(src, dst string, result chan<- bool) (err error) {
 			return
 		}
 	}
-
+	//https://blog.golang.org/pipelines
 	err = copyFileContents(src, dst)
 	if err != nil {
 		result <- false
