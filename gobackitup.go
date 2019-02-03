@@ -21,9 +21,11 @@ type BackupInfo struct {
 	dst  string
 	src  string
 	name string
+	blacklist string
 	zip  bool
 }
 
+var blacklist []string
 var data BackupInfo
 
 // Results
@@ -51,6 +53,15 @@ func errorMsg(err error) {
 	ct.ResetColor()
 
 	errors++
+}
+
+func isBlacklisted(s string) (result bool) {
+	for _, e := range blacklist {
+		if strings.ContainsAny(s, e) {
+			return true
+		}
+	}
+	return false
 }
 
 // Writes some output to console about a given file when copying or zipping
@@ -277,6 +288,7 @@ func init() {
 	flag.StringVar(&data.dst, "d", "", "(shorthand) Path to save backup to")
 	flag.StringVar(&data.name, "name", "", "(optional) Name of folder to save backup to ")
 	flag.StringVar(&data.name, "n", "", "(optional) (shorthand) Name of folder to save backup to")
+	flag.StringVar(&data.blacklist, "b", "", "(optional) file names and types to ignore")
 	flag.BoolVar(&data.zip, "zip", false, "(optional) Compress the backup")
 	flag.BoolVar(&data.zip, "z", false, "\n(optional) (shorthand) Compress the backup")
 }
@@ -284,6 +296,22 @@ func init() {
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	strings.Split(data.blacklist, ",")
+
+	if isBlacklisted(".git") {
+		fmt.Printf("its here")
+	} else {
+		fmt.Printf("its not here")
+	}
+	
+
+	if isBlacklisted("test") {
+		fmt.Printf("its here")
+	} else {
+		fmt.Printf("its not here")
+	}
+
 
 	// Check arguments are set
 	if data.src == "" || data.dst == "" {
@@ -307,6 +335,21 @@ func main() {
 			fmt.Fprint(os.Stderr, "Could not create folder %s", data.name)
 			os.Exit(1)
 		}
+	}
+
+	strings.Split(data.blacklist, ",")
+
+	if isBlacklisted(".git") {
+		fmt.Printf("its here")
+	} else {
+		fmt.Printf("its not here")
+	}
+	
+
+	if isBlacklisted("test") {
+		fmt.Printf("its here")
+	} else {
+		fmt.Printf("its not here")
 	}
 
 	var err error
